@@ -1,0 +1,33 @@
+include: package:lints/recommended.yaml
+
+analyzer:
+  exclude:
+    - build/**
+  strong-mode:
+    implicit-casts: false
+    implicit-dynamic: false
+
+linter:
+  rules:
+    # Dart Style
+    - camel_case_types
+    - library_names
+    - file_names
+    - library_prefixes
+    - non_constant_identifier_names
+    - constant_identifier_names
+
+    # Documentation
+    - public_member_api_docs
+    - comment_references
+
+    # Usage
+    - implementation_imports
+    - prefer_relative_imports
+    - avoid_relative_lib_imports
+
+    # Design
+    - use_key_in_widget_constructors
+    - prefer_const_constructors
+    - prefer_const_literals_to_create_immutables
+    - avoid_unnecessary_containers

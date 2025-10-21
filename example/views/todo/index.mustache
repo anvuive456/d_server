@@ -1,0 +1,12 @@
+<div>
+    <h1>Todo List</h1>
+
+    <form method="POST" action="/todos">
+        <input type="text" name="title" placeholder="New Todo Title" required class="rounded border px-2">
+        <button type="submit">Add Todo</button>
+    </form>
+
+
+
+    {{> todo/_todos }}
+</div>
