@@ -26,28 +26,48 @@ A powerful web framework for Dart that brings convention over configuration, Act
 
 ## 📦 Installation
 
-Add D_Server to your `pubspec.yaml`:
+### Step 1: Install CLI Tool globally
 
-```yaml
-dependencies:
-  d_server: ^0.1.0
-```
-
-Or install via pub:
-
-```bash
-dart pub add d_server
-```
-
-For CLI tools, install globally:
+First, activate the D_Server CLI tool globally:
 
 ```bash
 dart pub global activate d_server
 ```
 
+### Step 2: Create a new project
+
+Once the CLI tool is installed globally, you can create a new project:
+
+```bash
+d_server new [project_name]
+```
+
+For example:
+
+```bash
+d_server new my_awesome_app
+```
+
 ## 🚀 Quick Start
 
 ### 1. Create a new project
+
+After installing the CLI tool globally, create a new project:
+
+```bash
+# Create a new D_Server project
+d_server new my_awesome_app
+
+# Navigate to your project directory
+cd my_awesome_app
+
+# Your project is ready with the following structure:
+# lib/main.dart - Main application file
+# config/database.yml - Database configuration
+# config/app.yml - Application configuration
+```
+
+The generated `lib/main.dart` will look like this:
 
 ```dart
 // lib/main.dart
@@ -66,8 +86,6 @@ void main() async {
     'jwt_secret': 'your-secret-key-here',
     'environment': 'development',
   });
-  // Or load from config file
-  // final app = await DApplication.fromConfigFile('config/config.yml');
 
   // Define routes
   app.router.get('/', (request) {
