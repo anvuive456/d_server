@@ -138,6 +138,7 @@ class DApplication {
       defaultLayout: actualDefaultLayout ?? 'application',
       cacheEnabled:
           config.get<bool>('views.cache_enabled', defaultValue: true) ?? true,
+      config: config,
     );
 
     // Set template engine for all controllers
@@ -149,6 +150,77 @@ class DApplication {
   /// Add global middleware
   void use(Middleware middleware, {List<String>? only, List<String>? except}) {
     router.use(middleware, only: only, except: except);
+  }
+
+  /// Configure static files serving
+  void setupStaticFiles({
+    String? directory,
+    String? urlPath,
+    bool? enabled,
+    bool listDirectories = false,
+    Duration? maxAge,
+  }) {
+    // Check if static files are enabled (parameter overrides config)
+    final isEnabled = enabled ??
+        config.get<bool>('static_files.enabled', defaultValue: true) == true;
+
+    if (!isEnabled) {
+      _logger.debug('Static files disabled');
+      return;
+    }
+
+    // Get configuration values (parameters override config)
+    final staticDir = directory ??
+        config.get<String>('static_files.directory', defaultValue: 'public') ??
+        'public';
+    final staticPath = urlPath ??
+        config.get<String>('static_files.url_path', defaultValue: '/assets') ??
+        '/assets';
+    final configListDirectories = config
+            .get<bool>('static_files.list_directories', defaultValue: false) ??
+        false;
+    final configMaxAge = Duration(
+        seconds: config.get<int>('static_files.max_age_seconds',
+                defaultValue: 3600) ??
+            3600);
+
+    // Validate directory exists or create it
+    final dir = Directory(staticDir);
+    if (!dir.existsSync()) {
+      try {
+        dir.createSync(recursive: true);
+        _logger.info('Created static files directory: $staticDir');
+      } catch (e) {
+        _logger
+            .error('Failed to create static files directory "$staticDir": $e');
+        return;
+      }
+    }
+
+    try {
+      // Setup static file serving
+      router.serveStatic(
+        directory: staticDir,
+        urlPath: staticPath,
+        listDirectories: listDirectories || configListDirectories,
+        maxAge: maxAge ?? configMaxAge,
+      );
+
+      _logger.info('Static files enabled: $staticPath -> $staticDir');
+
+      // Log some example URLs in development
+      if (config.get<String>('server.environment') == 'development') {
+        final host =
+            config.get<String>('server.host', defaultValue: 'localhost');
+        final port = config.get<int>('server.port', defaultValue: 3000);
+        _logger.debug('Example static URLs:');
+        _logger.debug('  http://$host:$port$staticPath/css/app.css');
+        _logger.debug('  http://$host:$port$staticPath/js/app.js');
+        _logger.debug('  http://$host:$port$staticPath/images/logo.png');
+      }
+    } catch (e) {
+      _logger.error('Failed to setup static files: $e');
+    }
   }
 
   /// Configure built-in middleware
@@ -286,6 +358,9 @@ class DApplication {
     // Setup templates
     setupTemplates();
 
+    // Setup static files
+    setupStaticFiles();
+
     _logger.debug('Application components initialized');
   }
 
@@ -374,6 +449,13 @@ class DApplication {
         'path': 'views',
         'default_layout': 'application',
         'cache_enabled': true,
+      },
+      'static_files': {
+        'enabled': true,
+        'directory': 'public',
+        'url_path': '/assets',
+        'list_directories': false,
+        'max_age_seconds': 3600,
       },
       'cors': {
         'enabled': true,
@@ -481,6 +563,14 @@ views:
   path: views
   default_layout: application
 
+# Static files configuration
+static_files:
+  enabled: true              # Enable/disable static file serving
+  directory: public          # Directory containing static assets
+  url_path: /assets          # URL path prefix for static files
+  list_directories: false    # Allow directory browsing
+  max_age_seconds: 3600      # Cache duration in seconds (1 hour)
+
 cors:
   enabled: true
   allow_origin: "*"
@@ -508,19 +598,13 @@ hot_reload:
 name: $projectName
 description: A D_Server web application
 version: 1.0.0
+publish_to: "none"
 
 environment:
   sdk: ^3.0.0
 
 dependencies:
   d_server: ^0.1.0
-  shelf: ^1.4.1
-  shelf_router: ^1.1.4
-  shelf_static: ^1.1.2
-  args: ^2.4.2
-  yaml: ^3.1.2
-  postgres: ^3.0.2
-  bcrypt: ^1.1.3
 
 dev_dependencies:
   lints: ^3.0.0
@@ -689,6 +773,76 @@ void main() async {
   await app.start();
 }
 ''');
+
+    // Create sample static files
+    final cssDir = Directory('$projectName/public/css');
+    await cssDir.create(recursive: true);
+
+    final cssFile = File('$projectName/public/css/app.css');
+    await cssFile.writeAsString('''
+/* D_Server App Styles */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  margin: 0;
+  padding: 20px;
+  line-height: 1.6;
+  color: #333;
+  background-color: #f5f5f5;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+  color: #2c3e50;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
+}
+
+.btn {
+  display: inline-block;
+  padding: 10px 20px;
+  background: #3498db;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background 0.3s;
+}
+
+.btn:hover {
+  background: #2980b9;
+}
+''');
+
+    final jsDir = Directory('$projectName/public/js');
+    await jsDir.create(recursive: true);
+
+    final jsFile = File('$projectName/public/js/app.js');
+    await jsFile.writeAsString('''
+// D_Server App JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('D_Server app loaded successfully!');
+
+  // Add simple interactivity
+  const buttons = document.querySelectorAll('.btn');
+  buttons.forEach(button => {
+    button.addEventListener('click', function(e) {
+      console.log('Button clicked:', this.textContent);
+    });
+  });
+});
+''');
+
+    // Create favicon
+    final faviconFile = File('$projectName/public/favicon.ico');
+    // Create a simple text placeholder for favicon
+    await faviconFile.writeAsString('D_Server');
 
     logger.success('Created D_Server project: $projectName');
     logger.info('Next steps:');

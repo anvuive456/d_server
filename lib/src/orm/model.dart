@@ -446,13 +446,13 @@ abstract class DModel {
     // Use reflection to get the tableName static getter
     final classMirror = reflectClass(type);
     // print('Class mirror declarations: ${classMirror.declarations}');
-    final tableNameMirror = classMirror.declarations[Symbol('tableName')];
+    final tableNameMirror = classMirror.declarations[#tableName];
     // print('Table name mirror: $tableNameMirror');
 
     if (tableNameMirror != null &&
         tableNameMirror is MethodMirror &&
         tableNameMirror.isStatic) {
-      return classMirror.getField(Symbol('tableName')).reflectee as String;
+      return classMirror.getField(#tableName).reflectee as String;
     }
 
     // Fallback: convert class name to snake_case table name

@@ -34,10 +34,10 @@ import 'session_store.dart';
 ///
 ///       if (user != null) {
 ///         await signIn(user, rememberMe: body['remember_me'] == 'true');
-///         flash.set('success', 'Welcome back!');
+///         setFlash('success', 'Welcome back!');
 ///         return redirectTo('/dashboard');
 ///       } else {
-///         flash.set('error', 'Invalid email or password');
+///         setFlash('error', 'Invalid email or password');
 ///         return redirectBack();
 ///       }
 ///     }
@@ -68,7 +68,7 @@ mixin Authenticatable on DController {
   FlashMessages get flashMessages {
     final session = this.currentSession;
     if (session == null) {
-      throw StateError('No session available for flash messages');
+      return FlashMessages({});
     }
     return FlashMessages(session.data);
   }
@@ -82,7 +82,7 @@ mixin Authenticatable on DController {
       final currentUrl = request.requestedUri.toString();
       flashMessages.set('redirect_after_login', currentUrl);
 
-      throw RedirectException('/login');
+      throw DRedirectException('/login');
     }
   }
 
@@ -146,7 +146,7 @@ mixin Authenticatable on DController {
       _logger.warning(
           'Access denied: user ${currentUser!.email} lacks role: $role');
       flashMessages.set('error', 'Access denied');
-      throw RedirectException('/dashboard'); // or appropriate page
+      throw DRedirectException('/dashboard'); // or appropriate page
     }
   }
 
@@ -171,7 +171,7 @@ mixin Authenticatable on DController {
       _logger.warning(
           'Access denied: user ${currentUser!.email} cannot access resource');
       flashMessages.set('error', 'Access denied');
-      throw RedirectException('/dashboard');
+      throw DRedirectException('/');
     }
   }
 
@@ -186,7 +186,7 @@ mixin Authenticatable on DController {
   /// Redirect after successful login
   Response redirectAfterLogin() {
     final redirectUrl =
-        flashMessages.get<String>('redirect_after_login') ?? '/dashboard';
+        flashMessages.get<String>('redirect_after_login') ?? '/';
     return redirect(redirectUrl);
   }
 
@@ -330,7 +330,7 @@ mixin Authenticatable on DController {
     if (!verifyCsrfToken(token)) {
       _logger.warning('CSRF token verification failed');
       flashMessages.set('error', 'Security token verification failed');
-      throw RedirectException(request.requestedUri.path);
+      throw DRedirectException(request.requestedUri.path);
     }
   }
 
@@ -343,11 +343,11 @@ mixin Authenticatable on DController {
 }
 
 /// Exception for handling redirects in authentication flows
-class RedirectException implements Exception {
+class DRedirectException implements Exception {
   final String location;
   final int statusCode;
 
-  RedirectException(this.location, {this.statusCode = 302});
+  DRedirectException(this.location, {this.statusCode = 302});
 
   @override
   String toString() => 'RedirectException: $location';

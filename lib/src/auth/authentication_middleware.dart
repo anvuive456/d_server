@@ -112,6 +112,8 @@ class AuthenticationMiddleware {
       final updatedContext = Map<String, dynamic>.from(request.context)
         ..addAll(context);
 
+      _logger.info('Authentication context loaded:${context}');
+
       return request.change(context: updatedContext);
     } catch (e) {
       _logger.error('Error loading user from session: $e');

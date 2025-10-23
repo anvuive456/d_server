@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:d_server/src/auth/authenticatable.dart';
 import 'package:shelf/shelf.dart';
 import '../core/logger.dart';
 import '../templates/template_engine.dart';
@@ -487,6 +488,8 @@ abstract class DController {
       return unprocessableEntity(exception.errors, exception.message);
     } else if (exception is FormatException) {
       return badRequest(exception.message);
+    } else if (exception is DRedirectException) {
+      return redirect(exception.location, status: exception.statusCode);
     } else {
       _logger.error('Unhandled exception in controller: $exception');
       return internalServerError();

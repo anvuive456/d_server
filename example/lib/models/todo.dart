@@ -17,7 +17,12 @@ class Todo extends DModel {
   // Add your model methods here
 
   /// Custom finder methods
-  static Future<List<Todo>> listAll() async {
+  static Future<List<Todo>> listAll({
+    Map<String, dynamic>? filters,
+    Map<String, String>? sort,
+    int? limit,
+    int? offset,
+  }) async {
     return await DModel.all<Todo>();
   }
 

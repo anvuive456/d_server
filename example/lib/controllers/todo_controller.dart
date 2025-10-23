@@ -3,7 +3,13 @@ import 'package:d_server/d_server.dart';
 import '../models/todo.dart';
 
 /// Controller for managing Todo items
-class TodoController extends DController {
+class TodoController extends DController with Authenticatable {
+  @override
+  Future<void> beforeAction() async {
+    storeLocation();
+    authenticateUser();
+  }
+
   /// GET /todo
   @override
   Future<Response> index() async {

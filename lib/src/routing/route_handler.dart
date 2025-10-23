@@ -194,25 +194,79 @@ class RouteHandler {
     };
   }
 
-  /// Create a simple static file handler
-  static Handler staticFiles(String directory) {
+  /// Create a static file handler with advanced options
+  static Handler staticFiles(
+    String directory, {
+    bool listDirectories = false,
+    Duration? maxAge,
+  }) {
     return (Request request) async {
       final path = request.url.path;
-      final file = File('$directory/$path');
+      final fullPath = '$directory/$path';
+      final file = File(fullPath);
+      final dir = Directory(fullPath);
 
+      // Check if it's a directory
+      if (dir.existsSync() && listDirectories) {
+        return _serveDirectoryListing(dir, path);
+      }
+
+      // Check if file exists
       if (!file.existsSync()) {
         return Response.notFound('File not found');
       }
 
+      // Determine content type
       final contentType = _getContentType(path);
+
+      // Build cache control header
+      final maxAgeSeconds = maxAge?.inSeconds ?? 3600;
+      final cacheControl = 'public, max-age=$maxAgeSeconds';
+
       return Response.ok(
         file.openRead(),
         headers: {
           'content-type': contentType,
-          'cache-control': 'public, max-age=3600',
+          'cache-control': cacheControl,
+          'last-modified': file.lastModifiedSync().toUtc().toIso8601String(),
         },
       );
     };
+  }
+
+  /// Serve directory listing (simple HTML)
+  static Response _serveDirectoryListing(Directory dir, String path) {
+    final entries = dir.listSync()..sort((a, b) => a.path.compareTo(b.path));
+
+    final html = StringBuffer()
+      ..writeln('<!DOCTYPE html>')
+      ..writeln('<html>')
+      ..writeln('<head><title>Directory: $path</title></head>')
+      ..writeln('<body>')
+      ..writeln('<h1>Directory: $path</h1>')
+      ..writeln('<ul>');
+
+    if (path != '/') {
+      html.writeln('<li><a href="../">../</a></li>');
+    }
+
+    for (final entry in entries) {
+      final name = entry.path.split('/').last;
+      final isDir = entry is Directory;
+      final displayName = isDir ? '$name/' : name;
+      html.writeln(
+          '<li><a href="$name${isDir ? '/' : ''}">$displayName</a></li>');
+    }
+
+    html
+      ..writeln('</ul>')
+      ..writeln('</body>')
+      ..writeln('</html>');
+
+    return Response.ok(
+      html.toString(),
+      headers: {'content-type': 'text/html'},
+    );
   }
 
   /// Helper to determine content type from file extension

@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'dart:mirrors';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import '../controllers/base_controller.dart';
 import '../core/logger.dart';
+import 'route_handler.dart';
 
 /// RESTful routing system for D_Server framework
 ///
@@ -38,6 +40,7 @@ class DRouter {
   final List<Middleware> _globalMiddleware = [];
   final Map<String, List<Middleware>> _routeMiddleware = {};
   final ScopedLogger _logger = DLogger.scoped('ROUTER');
+  bool _staticFilesEnabled = false;
 
   /// Get the underlying Shelf router handler
   Handler get handler {
@@ -260,6 +263,54 @@ class DRouter {
     _logger.debug('Registered 404 handler');
   }
 
+  /// Serve static files from a directory
+  void serveStatic({
+    String directory = 'public',
+    String urlPath = '/assets',
+    bool listDirectories = false,
+    Duration? maxAge,
+  }) {
+    if (_staticFilesEnabled) {
+      _logger.warning('Static files already enabled, skipping...');
+      return;
+    }
+
+    // Check if directory exists
+    final dir = Directory(directory);
+    if (!dir.existsSync()) {
+      _logger.warning(
+          'Static directory "$directory" does not exist, creating it...');
+      try {
+        dir.createSync(recursive: true);
+      } catch (e) {
+        _logger.error('Failed to create directory "$directory": $e');
+        return;
+      }
+    }
+
+    // Create static file handler with options
+    final staticHandler = RouteHandler.staticFiles(
+      directory,
+      listDirectories: listDirectories,
+      maxAge: maxAge,
+    );
+
+    // Register the route
+    final routePath =
+        urlPath.endsWith('/<path|.*>') ? urlPath : '$urlPath/<path|.*>';
+
+    _router.get(routePath, staticHandler);
+    _staticFilesEnabled = true;
+
+    _logger.info('Static files enabled: $urlPath -> $directory');
+    _logger.debug('Static route registered: GET $routePath');
+  }
+
+  /// Enable default static file serving
+  void enableDefaultStatic() {
+    serveStatic();
+  }
+
   /// Create a controller action handler
   Handler _createControllerHandler(Type controllerType, String actionName) {
     return (Request request) async {
@@ -379,6 +430,7 @@ class DRouter {
     return {
       'global_middleware_count': _globalMiddleware.length,
       'route_middleware_count': _routeMiddleware.length,
+      'static_files_enabled': _staticFilesEnabled,
     };
   }
 }
