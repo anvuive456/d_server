@@ -201,8 +201,11 @@ class RouteHandler {
     Duration? maxAge,
   }) {
     return (Request request) async {
-      final path = request.url.path;
-      final fullPath = '$directory/$path';
+      // Get path from route parameters, not from request.url.path
+      final params = RequestParams(request);
+      final path = params.get<String>('path') ?? '';
+
+      final fullPath = path.isEmpty ? directory : '$directory/$path';
       final file = File(fullPath);
       final dir = Directory(fullPath);
 
@@ -234,39 +237,101 @@ class RouteHandler {
     };
   }
 
-  /// Serve directory listing (simple HTML)
+  /// Serve directory listing (enhanced HTML with better UI)
   static Response _serveDirectoryListing(Directory dir, String path) {
-    final entries = dir.listSync()..sort((a, b) => a.path.compareTo(b.path));
+    try {
+      _logger.debug('Serving directory listing for: ${dir.path} (path: $path)');
 
-    final html = StringBuffer()
-      ..writeln('<!DOCTYPE html>')
-      ..writeln('<html>')
-      ..writeln('<head><title>Directory: $path</title></head>')
-      ..writeln('<body>')
-      ..writeln('<h1>Directory: $path</h1>')
-      ..writeln('<ul>');
+      final entries = dir.listSync()
+        ..sort((a, b) {
+          // Directories first, then files, both alphabetically
+          if (a is Directory && b is File) return -1;
+          if (a is File && b is Directory) return 1;
+          return a.path.toLowerCase().compareTo(b.path.toLowerCase());
+        });
 
-    if (path != '/') {
-      html.writeln('<li><a href="../">../</a></li>');
+      final displayPath = path.isEmpty ? '/' : path;
+
+      final html = StringBuffer()
+        ..writeln('<!DOCTYPE html>')
+        ..writeln('<html lang="en">')
+        ..writeln('<head>')
+        ..writeln('  <meta charset="UTF-8">')
+        ..writeln(
+            '  <meta name="viewport" content="width=device-width, initial-scale=1.0">')
+        ..writeln('  <title>Directory: $displayPath</title>')
+        ..writeln('  <style>')
+        ..writeln(
+            '    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }')
+        ..writeln(
+            '    .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 30px; }')
+        ..writeln(
+            '    h1 { color: #333; border-bottom: 2px solid #007acc; padding-bottom: 10px; }')
+        ..writeln('    .file-list { list-style: none; padding: 0; }')
+        ..writeln(
+            '    .file-item { padding: 12px; border-bottom: 1px solid #eee; transition: background 0.2s; }')
+        ..writeln('    .file-item:hover { background: #f8f9fa; }')
+        ..writeln(
+            '    .file-item a { text-decoration: none; color: #333; display: flex; align-items: center; }')
+        ..writeln('    .file-item a:hover { color: #007acc; }')
+        ..writeln('    .icon { margin-right: 10px; font-size: 18px; }')
+        ..writeln('    .directory { color: #007acc; }')
+        ..writeln('    .file { color: #666; }')
+        ..writeln('    .parent { font-weight: bold; color: #007acc; }')
+        ..writeln('  </style>')
+        ..writeln('</head>')
+        ..writeln('<body>')
+        ..writeln('  <div class="container">')
+        ..writeln('    <h1>📁 Directory: $displayPath</h1>')
+        ..writeln('    <ul class="file-list">');
+
+      // Add parent directory link if not at root
+      if (path.isNotEmpty && path != '/') {
+        html
+          ..writeln('      <li class="file-item">')
+          ..writeln('        <a href="../" class="parent">')
+          ..writeln('          <span class="icon">⬆️</span>')
+          ..writeln('          <span>.. (Parent Directory)</span>')
+          ..writeln('        </a>')
+          ..writeln('      </li>');
+      }
+
+      // Add entries
+      for (final entry in entries) {
+        final name = entry.path.split('/').last;
+        final isDir = entry is Directory;
+        final icon = isDir ? '📁' : '📄';
+        final cssClass = isDir ? 'directory' : 'file';
+        final href = isDir ? '$name/' : name;
+
+        html
+          ..writeln('      <li class="file-item">')
+          ..writeln('        <a href="$href" class="$cssClass">')
+          ..writeln('          <span class="icon">$icon</span>')
+          ..writeln('          <span>$name${isDir ? '/' : ''}</span>')
+          ..writeln('        </a>')
+          ..writeln('      </li>');
+      }
+
+      html
+        ..writeln('    </ul>')
+        ..writeln('  </div>')
+        ..writeln('</body>')
+        ..writeln('</html>');
+
+      _logger.debug(
+          'Directory listing generated successfully with ${entries.length} entries');
+
+      return Response.ok(
+        html.toString(),
+        headers: {'content-type': 'text/html; charset=utf-8'},
+      );
+    } catch (e) {
+      _logger.error('Error serving directory listing: $e');
+      return Response.internalServerError(
+        body: 'Error loading directory listing: $e',
+      );
     }
-
-    for (final entry in entries) {
-      final name = entry.path.split('/').last;
-      final isDir = entry is Directory;
-      final displayName = isDir ? '$name/' : name;
-      html.writeln(
-          '<li><a href="$name${isDir ? '/' : ''}">$displayName</a></li>');
-    }
-
-    html
-      ..writeln('</ul>')
-      ..writeln('</body>')
-      ..writeln('</html>');
-
-    return Response.ok(
-      html.toString(),
-      headers: {'content-type': 'text/html'},
-    );
   }
 
   /// Helper to determine content type from file extension
