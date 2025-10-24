@@ -89,7 +89,7 @@ void main() async {
 
   // Define routes
   app.router.get('/', (request) {
-    return Response.ok('Welcome to D_Server! 🎉');
+    return ResponseHelpers.html(app.templates.renderWithDefaultLayout('welcome'));
   });
 
   app.router.resource('users', UsersController);
@@ -434,7 +434,7 @@ class PostsController extends DController {
 ### Template Files
 
 ```html
-<!-- views/layouts/application.mustache -->
+<!-- views/layouts/application.html.dt -->
 <!DOCTYPE html>
 <html>
   <head>
@@ -450,7 +450,7 @@ class PostsController extends DController {
   </body>
 </html>
 
-<!-- views/posts/show.mustache -->
+<!-- views/posts/show.html.dt -->
 <article>
   <h1>{{post.title}}</h1>
   <div class="content">{{post.content}}</div>
@@ -547,13 +547,13 @@ my_app/
 │       └── post.dart
 ├── views/                        # Templates
 │   ├── layouts/
-│   │   └── application.mustache
+│   │   └── application.html.dt
 │   ├── users/
-│   │   ├── index.mustache
-│   │   └── show.mustache
+│   │   ├── index.html.dt
+│   │   └── show.html.dt
 │   └── posts/
-│       ├── index.mustache
-│       └── show.mustache
+│       ├── index.html.dt
+│       └── show.html.dt
 ├── config/                       # Configuration
 │   └── config.yml
 │

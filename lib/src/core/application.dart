@@ -766,7 +766,7 @@ void main() async {
 
   // Define routes
   app.router.get('/', (request) {
-    return Response.ok('Welcome to $projectName!');
+    return ResponseHelpers.html(app.templates.renderWithDefaultLayout('welcome'));
   });
 
   // Start the server

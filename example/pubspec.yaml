@@ -1,6 +1,7 @@
 name: example
 description: A D_Server web application
 version: 1.0.0
+publish_to: "none"
 
 environment:
   sdk: ^3.0.0

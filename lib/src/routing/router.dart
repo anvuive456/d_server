@@ -308,7 +308,7 @@ class DRouter {
 
   /// Enable default static file serving
   void enableDefaultStatic() {
-    serveStatic();
+    serveStatic(listDirectories: true);
   }
 
   /// Create a controller action handler

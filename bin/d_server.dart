@@ -30,12 +30,10 @@ void main(List<String> args) async {
       case 'new':
         await _createProject(args);
         break;
-      case 'generate':
-      case 'g':
+      case 'generate' || 'g':
         await _generate(args);
         break;
-      case 'server':
-      case 's':
+      case 'server' || 's':
         await _startServer(args);
         break;
       case 'dev':
@@ -56,14 +54,10 @@ void main(List<String> args) async {
       case 'db:reset':
         await _resetDatabase(args);
         break;
-      case 'version':
-      case '--version':
-      case '-v':
+      case 'version' || '--version' || '-v':
         _printVersion();
         break;
-      case 'help':
-      case '--help':
-      case '-h':
+      case 'help' || '--help' || '-h':
         _printUsage();
         break;
       default:
