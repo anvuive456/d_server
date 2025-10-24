@@ -7,3 +7,8 @@
 - Improve template engine.
 - Improve authentication.
 - Add asset pipeline support.
+
+## 0.3.0
+
+- New Template Engine with better performance.
+- Fix asset pipeline bugs.
