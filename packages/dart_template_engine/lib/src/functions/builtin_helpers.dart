@@ -51,6 +51,7 @@ class BuiltinHelpers {
     registry.registerBuiltinFunction('capitalize', _capitalize);
     registry.registerBuiltinFunction('truncate', _truncate);
     registry.registerBuiltinFunction('trim', _trim);
+    registry.registerBuiltinFunction('text', _text);
 
     // Date helpers
     registry.registerBuiltinFunction('formatDate', _formatDate);
@@ -75,6 +76,11 @@ class BuiltinHelpers {
     registry.registerBuiltinFunction('default', _default);
     registry.registerBuiltinFunction('isEmpty', _isEmpty);
     registry.registerBuiltinFunction('isNotEmpty', _isNotEmpty);
+  }
+
+  static dynamic _text(List<dynamic> args) {
+    if (args.isEmpty) return '';
+    return args.join('');
   }
 
   // String helpers implementation
@@ -113,6 +119,7 @@ class BuiltinHelpers {
 
   // Date helpers implementation
   static dynamic _formatDate(List<dynamic> args) {
+    print('Format Date ${args}');
     if (args.isEmpty) return '';
     final date = args[0];
     if (date == null) return '';
@@ -131,6 +138,7 @@ class BuiltinHelpers {
     try {
       return DateFormat(format).format(dateTime);
     } catch (e) {
+      print('Date format error: $e');
       return dateTime.toString();
     }
   }

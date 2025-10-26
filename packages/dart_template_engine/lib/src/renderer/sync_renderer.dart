@@ -229,26 +229,97 @@ class SyncRenderer {
     final args = <dynamic>[];
 
     for (final argDef in argumentDefs) {
-      if (argDef is Map && argDef['type'] == 'variable') {
-        // Variable reference
-        final path = argDef['path'] as List<String>;
-        dynamic value = context;
-        for (final segment in path) {
-          if (value is Map<String, dynamic>) {
-            value = value[segment];
-          } else if (value != null) {
-            try {
-              value = MethodInvoker.getProperty(value, segment);
-            } catch (e) {
+      if (argDef is Map<String, dynamic>) {
+        final type = argDef['type'] as String?;
+
+        if (type == 'variable') {
+          // Variable reference
+          final path = argDef['path'] as List<String>;
+          dynamic value = context;
+          for (final segment in path) {
+            if (value is Map<String, dynamic>) {
+              value = value[segment];
+            } else if (value != null) {
+              try {
+                value = MethodInvoker.getProperty(value, segment);
+              } catch (e) {
+                value = null;
+                break;
+              }
+            } else {
               value = null;
               break;
             }
-          } else {
-            value = null;
-            break;
           }
+          args.add(value);
+        } else if (type == 'function') {
+          // Nested function call
+          final functionName = argDef['functionName'] as String?;
+          final isHelper = argDef['isHelper'] as bool? ?? false;
+          final nestedArgs = argDef['arguments'] as List<dynamic>? ?? [];
+
+          if (functionName != null) {
+            try {
+              final resolvedNestedArgs = _resolveArguments(nestedArgs, context);
+
+              if (isHelper) {
+                final cleanName = functionName.startsWith('@')
+                    ? functionName.substring(1)
+                    : functionName;
+                if (_functionRegistry.hasFunction(cleanName)) {
+                  final result = _functionRegistry.callFunction(
+                      cleanName, resolvedNestedArgs);
+                  args.add(result);
+                } else {
+                  args.add(null);
+                }
+              } else {
+                // Method call - similar to _callFunction logic
+                final parts = functionName.split('.');
+                if (parts.length >= 2) {
+                  final objectPath = parts.sublist(0, parts.length - 1);
+                  final methodName = parts.last;
+
+                  dynamic obj = context;
+                  for (final segment in objectPath) {
+                    if (obj == null) break;
+                    if (obj is Map<String, dynamic>) {
+                      obj = obj[segment];
+                    } else {
+                      try {
+                        obj = MethodInvoker.getProperty(obj, segment);
+                      } catch (e) {
+                        obj = null;
+                        break;
+                      }
+                    }
+                  }
+
+                  if (obj != null) {
+                    try {
+                      final result = MethodInvoker.invokeMethod(
+                          obj, methodName, resolvedNestedArgs);
+                      args.add(result);
+                    } catch (e) {
+                      args.add(null);
+                    }
+                  } else {
+                    args.add(null);
+                  }
+                } else {
+                  args.add(null);
+                }
+              }
+            } catch (e) {
+              args.add(null);
+            }
+          } else {
+            args.add(null);
+          }
+        } else {
+          // Unknown type, add as-is
+          args.add(argDef);
         }
-        args.add(value);
       } else {
         // Literal value
         args.add(argDef);

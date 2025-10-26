@@ -27,7 +27,7 @@ class Lexer {
   static final RegExp _commentPattern = RegExp(r'^!\s*(.*)$');
   static final RegExp _partialPattern = RegExp(r'^>\s*(.+)$');
   static final RegExp _functionCallPattern = RegExp(
-    r'^(@?\w+(?:\.\w+)*)\s*\(([^)]*)\)$',
+    r'^(@?\w+(?:\.\w+)*)\s*\(',
   );
   // Argument parsing patterns
   static final RegExp _stringPattern = RegExp(r"^'([^']*)'|^" '"([^"]*)"');
@@ -171,14 +171,20 @@ class Lexer {
     final functionCallMatch = _functionCallPattern.firstMatch(content);
     if (functionCallMatch != null) {
       final functionName = functionCallMatch.group(1)!;
-      final argsString = functionCallMatch.group(2) ?? '';
-      final isHelper = functionName.startsWith('@');
+      final isHelper = content.startsWith('@');
 
-      return Token.functionCall(content, position, metadata: {
-        'functionName': functionName,
-        'arguments': _parseArguments(argsString),
-        'isHelper': isHelper,
-      });
+      // Find the matching closing parenthesis
+      final openParenIndex = content.indexOf('(');
+      if (openParenIndex != -1) {
+        final argsString = _extractBalancedParentheses(content, openParenIndex);
+        if (argsString != null) {
+          return Token.functionCall(content, position, metadata: {
+            'functionName': functionName,
+            'arguments': _parseArguments(argsString),
+            'isHelper': isHelper,
+          });
+        }
+      }
     }
 
     // Default to variable
@@ -212,14 +218,20 @@ class Lexer {
     if (functionMatch != null) {
       final isHelper = content.startsWith('@');
       final functionName = functionMatch.group(1)!;
-      final argsString = functionMatch.group(2) ?? '';
 
-      return Token.functionCall(content, position, metadata: {
-        'functionName': functionName,
-        'arguments': _parseArguments(argsString),
-        'isHelper': isHelper,
-        'unescaped': true, // Mark as unescaped function call
-      });
+      // Find the matching closing parenthesis
+      final openParenIndex = content.indexOf('(');
+      if (openParenIndex != -1) {
+        final argsString = _extractBalancedParentheses(content, openParenIndex);
+        if (argsString != null) {
+          return Token.functionCall(content, position, metadata: {
+            'functionName': functionName,
+            'arguments': _parseArguments(argsString),
+            'isHelper': isHelper,
+            'unescaped': true, // Mark as unescaped function call
+          });
+        }
+      }
     }
 
     // Otherwise, it's an unescaped variable
@@ -292,6 +304,35 @@ class Lexer {
         continue;
       }
 
+      // Function calls (nested functions)
+      final functionMatch = _functionCallPattern.firstMatch(remaining);
+      if (functionMatch != null) {
+        final isHelper = remaining.startsWith('@');
+        final functionName = functionMatch.group(1)!;
+
+        // Find the matching closing parenthesis
+        final openParenIndex = remaining.indexOf('(');
+        if (openParenIndex != -1) {
+          final argsString =
+              _extractBalancedParentheses(remaining, openParenIndex);
+          if (argsString != null) {
+            final matchedLength = openParenIndex +
+                1 +
+                argsString.length +
+                1; // function( + args + )
+
+            args.add({
+              'type': 'function',
+              'functionName': functionName,
+              'arguments': _parseArguments(argsString),
+              'isHelper': isHelper,
+            });
+            position += matchedLength;
+            continue;
+          }
+        }
+      }
+
       // Variable references
       final variableMatch = _variablePattern.firstMatch(remaining);
       if (variableMatch != null) {
@@ -305,13 +346,46 @@ class Lexer {
       }
 
       // If we get here, we couldn't parse the argument
+      final previewLength = remaining.length > 10 ? 10 : remaining.length;
       throw TemplateException.parsing(
-        'Invalid argument syntax: ${remaining.substring(0, 10)}...',
+        'Invalid argument syntax: ${remaining.substring(0, previewLength)}...',
         position: position,
       );
     }
 
     return args;
+  }
+
+  /// Extracts content between balanced parentheses starting at the given index.
+  /// Returns the content inside the parentheses or null if parentheses are not balanced.
+  String? _extractBalancedParentheses(String text, int startIndex) {
+    if (startIndex >= text.length || text[startIndex] != '(') {
+      return null;
+    }
+
+    var depth = 0;
+    var endIndex = startIndex;
+
+    for (var i = startIndex; i < text.length; i++) {
+      final char = text[i];
+      if (char == '(') {
+        depth++;
+      } else if (char == ')') {
+        depth--;
+        if (depth == 0) {
+          endIndex = i;
+          break;
+        }
+      }
+    }
+
+    if (depth != 0) {
+      // Unbalanced parentheses
+      return null;
+    }
+
+    // Return content between parentheses (excluding the parentheses themselves)
+    return text.substring(startIndex + 1, endIndex);
   }
 }
 
