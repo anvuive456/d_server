@@ -1,3 +1,5 @@
+import 'package:d_server/src/orm/relationships/foreign_actions.dart';
+
 import '../orm/database_connection.dart';
 import '../core/logger.dart';
 
@@ -133,6 +135,103 @@ abstract class Migration {
     await db.execute('DROP INDEX IF EXISTS $indexName');
   }
 
+  /// Add a foreign key constraint to existing table
+  Future<void> addForeignKey(
+    String tableName,
+    String columnName,
+    String referencedTable, {
+    String referencedColumn = 'id',
+    String? constraintName,
+
+    /// Optional actions on delete and update
+    /// e.g., [ForeignKeyAction.cascade], [ForeignKeyAction.setNull], [ForeignKeyAction.restrict]
+    ForeignKeyAction? onDelete,
+
+    /// Optional action on update
+    /// e.g., [ForeignKeyAction.cascade], [ForeignKeyAction.setNull], [ForeignKeyAction.restrict]
+    ForeignKeyAction? onUpdate,
+  }) async {
+    final constraintNameStr =
+        constraintName ?? 'fk_${tableName}_${columnName}_${referencedTable}';
+
+    String sql = 'ALTER TABLE $tableName ADD CONSTRAINT $constraintNameStr '
+        'FOREIGN KEY ($columnName) REFERENCES $referencedTable($referencedColumn)';
+
+    if (onDelete != null && onDelete != ForeignKeyAction.noAction) {
+      sql += ' ON DELETE ${onDelete.sql}';
+    }
+
+    if (onUpdate != null && onUpdate != ForeignKeyAction.noAction) {
+      sql += ' ON UPDATE ${onUpdate.sql}';
+    }
+
+    await db.execute(sql);
+  }
+
+  /// Drop a foreign key constraint
+  Future<void> dropForeignKey(
+    String tableName,
+    String constraintName,
+  ) async {
+    await db.execute('ALTER TABLE $tableName DROP CONSTRAINT $constraintName');
+  }
+
+  /// Create a pivot table for many-to-many relationships
+  Future<void> createPivotTable(
+    String table1,
+    String table2, {
+    String? pivotTableName,
+    String? foreignKey1,
+    String? foreignKey2,
+    bool withTimestamps = false,
+    Map<String, String>? additionalColumns,
+  }) async {
+    final pivotName = pivotTableName ?? _defaultPivotTableName(table1, table2);
+    final fk1 = foreignKey1 ?? '${_singularize(table1)}_id';
+    final fk2 = foreignKey2 ?? '${_singularize(table2)}_id';
+
+    await createTable(pivotName, (table) {
+      table.integer(fk1).notNull();
+      table.integer(fk2).notNull();
+
+      // Add foreign key constraints
+      table._constraints
+          .add('FOREIGN KEY ($fk1) REFERENCES $table1(id) ON DELETE CASCADE');
+      table._constraints
+          .add('FOREIGN KEY ($fk2) REFERENCES $table2(id) ON DELETE CASCADE');
+
+      // Add composite primary key
+      table._constraints.add('PRIMARY KEY ($fk1, $fk2)');
+
+      // Add additional columns if provided
+      if (additionalColumns != null) {
+        additionalColumns.forEach((columnName, columnType) {
+          table._addColumn('$columnName $columnType');
+        });
+      }
+
+      if (withTimestamps) {
+        table.timestamps();
+      }
+    });
+  }
+
+  /// Get default pivot table name
+  String _defaultPivotTableName(String table1, String table2) {
+    final tables = [table1, table2]..sort();
+    return tables.join('_');
+  }
+
+  /// Helper method to singularize table names
+  String _singularize(String tableName) {
+    if (tableName.endsWith('ies')) {
+      return '${tableName.substring(0, tableName.length - 3)}y';
+    } else if (tableName.endsWith('s')) {
+      return tableName.substring(0, tableName.length - 1);
+    }
+    return tableName;
+  }
+
   /// Execute raw SQL
   Future<void> execute(String sql) async {
     await db.execute(sql);
@@ -224,6 +323,81 @@ class TableBuilder {
     final builder = integer(columnName);
     _constraints.add('FOREIGN KEY ($columnName) REFERENCES $table($column)');
     return builder;
+  }
+
+  /// Add a foreign key constraint with cascade options
+  ColumnBuilder foreignKey(
+    String table, {
+    String? column = 'id',
+    String? columnName,
+    String? onDelete,
+    String? onUpdate,
+    bool addIndex = true,
+  }) {
+    final keyColumnName = columnName ?? '${_singularize(table)}_id';
+    final builder = integer(keyColumnName);
+
+    // Build constraint with cascade options
+    String constraintSql =
+        'FOREIGN KEY ($keyColumnName) REFERENCES $table(${column ?? 'id'})';
+
+    if (onDelete != null) {
+      constraintSql += ' ON DELETE $onDelete';
+    }
+
+    if (onUpdate != null) {
+      constraintSql += ' ON UPDATE $onUpdate';
+    }
+
+    _constraints.add(constraintSql);
+
+    // Add index for foreign key if requested
+    if (addIndex) {
+      _constraints
+          .add('INDEX idx_${tableName}_$keyColumnName ($keyColumnName)');
+    }
+
+    return builder;
+  }
+
+  /// Add a composite foreign key
+  void compositeForeignKey(
+    List<String> columns,
+    String referencedTable,
+    List<String> referencedColumns, {
+    String? onDelete,
+    String? onUpdate,
+  }) {
+    if (columns.length != referencedColumns.length) {
+      throw ArgumentError(
+          'Columns and referenced columns must have the same length');
+    }
+
+    final columnList = columns.join(', ');
+    final referencedColumnList = referencedColumns.join(', ');
+
+    String constraintSql =
+        'FOREIGN KEY ($columnList) REFERENCES $referencedTable($referencedColumnList)';
+
+    if (onDelete != null) {
+      constraintSql += ' ON DELETE $onDelete';
+    }
+
+    if (onUpdate != null) {
+      constraintSql += ' ON UPDATE $onUpdate';
+    }
+
+    _constraints.add(constraintSql);
+  }
+
+  /// Helper method to singularize table names
+  String _singularize(String tableName) {
+    if (tableName.endsWith('ies')) {
+      return tableName.substring(0, tableName.length - 3) + 'y';
+    } else if (tableName.endsWith('s')) {
+      return tableName.substring(0, tableName.length - 1);
+    }
+    return tableName;
   }
 
   /// Build the CREATE TABLE SQL

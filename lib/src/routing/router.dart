@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:mirrors';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
+import 'package:shelf_web_socket/shelf_web_socket.dart';
 import '../controllers/base_controller.dart';
 import '../core/logger.dart';
 import 'route_handler.dart';
@@ -41,6 +42,7 @@ class DRouter {
   final Map<String, List<Middleware>> _routeMiddleware = {};
   final ScopedLogger _logger = DLogger.scoped('ROUTER');
   bool _staticFilesEnabled = false;
+  bool _webSocketEnabled = false;
 
   /// Get the underlying Shelf router handler
   Handler get handler {

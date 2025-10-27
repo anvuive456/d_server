@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:d_server/d_server.dart';
 
 import '../migrate/20251021094924_create_todos.dart';
+import '../migrate/20251026162521_create_task.dart';
 
 void main(List<String> args) async {
   // Setup database connection
@@ -30,6 +31,7 @@ void main(List<String> args) async {
 
   final migrations = <String, Migration Function()>{
     '20251021094924_create_todos.dart': () => CreateTodos(),
+    '20251026162521_create_task.dart': () => CreateTask(),
   };
 
   if (command == 'rollback') {
@@ -40,8 +42,7 @@ void main(List<String> args) async {
   exit(0);
 }
 
-Future<void> handleMigrate(
-    String? target, Map<String, Migration Function()> migrations) async {
+Future<void> handleMigrate(String? target, Map<String, Migration Function()> migrations) async {
   if (target != null) {
     // Run specific migration
     final migrationFactory = migrations[target];
@@ -66,8 +67,7 @@ Future<void> handleMigrate(
   }
 }
 
-Future<void> handleRollback(
-    String? target, Map<String, Migration Function()> migrations) async {
+Future<void> handleRollback(String? target, Map<String, Migration Function()> migrations) async {
   if (target != null) {
     final steps = int.tryParse(target);
     if (steps != null) {

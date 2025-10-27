@@ -40,10 +40,15 @@ library d_server;
 export 'src/core/application.dart';
 export 'src/core/logger.dart';
 export 'src/core/config.dart';
-
+export 'package:shelf_web_socket/shelf_web_socket.dart';
 // ORM
 export 'src/orm/model.dart';
 export 'src/orm/database_connection.dart';
+export 'src/orm/query_builder.dart';
+export 'src/orm/relationships/belongs_to.dart';
+export 'src/orm/relationships/has_many.dart';
+export 'src/orm/relationships/has_one.dart';
+export 'src/orm/relationships/foreign_actions.dart';
 
 // Migrations
 export 'src/migrations/migration.dart';

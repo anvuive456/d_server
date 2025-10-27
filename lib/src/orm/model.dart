@@ -2,6 +2,12 @@ import 'dart:mirrors';
 
 import '../core/logger.dart';
 import 'database_connection.dart';
+import 'query_builder.dart';
+import 'relationships/relationship.dart';
+import 'relationships/has_one.dart';
+import 'relationships/has_many.dart';
+import 'relationships/belongs_to.dart';
+import 'relationships/belongs_to_many.dart';
 
 /// Base Active Record model class for D_Server framework
 ///
@@ -40,6 +46,7 @@ abstract class DModel {
 
   final Map<String, dynamic> _attributes = {};
   final Map<String, dynamic> _originalAttributes = {};
+  final Map<String, dynamic> _relationshipCache = {};
   bool _isNewRecord = true;
   bool _isDestroyed = false;
 
@@ -161,22 +168,24 @@ abstract class DModel {
 
   // Query Methods
 
+  /// Create a query builder for this model type
+  ///
+  /// ```dart
+  /// final users = await User.query().where('active = @active', {'active': true}).get();
+  /// final posts = await Post.query().with('user').with('comments').get();
+  /// ```
+  static QueryBuilder<T> query<T extends DModel>() {
+    return QueryBuilder<T>(T);
+  }
+
   /// Find all records
   static Future<List<T>> all<T extends DModel>() async {
-    final tableName = _getTableNameStatic<T>();
-    final results = await connection.query('SELECT * FROM $tableName');
-    return results.map((row) => _createFromMap<T>(row)).toList();
+    return await query<T>().get();
   }
 
   /// Find a record by primary key
   static Future<T?> find<T extends DModel>(dynamic id) async {
-    final tableName = _getTableNameStatic<T>();
-    final result = await connection.queryOne(
-      'SELECT * FROM $tableName WHERE $primaryKey = @id',
-      {'id': id},
-    );
-
-    return result != null ? _createFromMap<T>(result) : null;
+    return await query<T>().where('$primaryKey = @id', {'id': id}).first();
   }
 
   /// Find records matching a condition
@@ -184,12 +193,7 @@ abstract class DModel {
     String condition, [
     Map<String, dynamic>? parameters,
   ]) async {
-    final tableName = _getTableNameStatic<T>();
-    final results = await connection.query(
-      'SELECT * FROM $tableName WHERE $condition',
-      parameters,
-    );
-    return results.map((row) => _createFromMap<T>(row)).toList();
+    return await query<T>().where(condition, parameters).get();
   }
 
   /// Find the first record matching a condition
@@ -197,8 +201,7 @@ abstract class DModel {
     String condition, [
     Map<String, dynamic>? parameters,
   ]) async {
-    final records = await where<T>(condition, parameters);
-    return records.isNotEmpty ? records.first : null;
+    return await query<T>().where(condition, parameters).first();
   }
 
   /// Count records matching a condition
@@ -206,15 +209,11 @@ abstract class DModel {
     String? condition,
     Map<String, dynamic>? parameters,
   ]) async {
-    final tableName = _getTableNameStatic<T>();
-    final whereClause = condition != null ? 'WHERE $condition' : '';
-
-    final result = await connection.queryOne(
-      'SELECT COUNT(*) as count FROM $tableName $whereClause',
-      parameters,
-    );
-
-    return result?['count'] ?? 0;
+    final queryBuilder = query<T>();
+    if (condition != null) {
+      queryBuilder.where(condition, parameters);
+    }
+    return await queryBuilder.count();
   }
 
   /// Check if any records exist matching a condition
@@ -222,8 +221,11 @@ abstract class DModel {
     String? condition,
     Map<String, dynamic>? parameters,
   ]) async {
-    final count = await DModel.count<T>(condition, parameters);
-    return count > 0;
+    final queryBuilder = query<T>();
+    if (condition != null) {
+      queryBuilder.where(condition, parameters);
+    }
+    return await queryBuilder.exists();
   }
 
   /// Create a new record and save it to the database
@@ -231,9 +233,18 @@ abstract class DModel {
     Map<String, dynamic> attributes,
   ) async {
     final record = _createFromMap<T>({});
-    record._setAttributes(attributes);
+    record._setAttributes(attributes, isNewRecord: true);
     final saved = await record.save();
     return saved ? record : null;
+  }
+
+  /// Find records with eager loading
+  ///
+  /// ```dart
+  /// final users = await User.with('profile').with('posts').get();
+  /// ```
+  static QueryBuilder<T> include<T extends DModel>(String relationship) {
+    return query<T>().withRelation(relationship);
   }
 
   // Attribute Management
@@ -280,9 +291,14 @@ abstract class DModel {
 
   /// Convert model to map
   Map<String, dynamic> toMap() {
-    return Map<String, dynamic>.from(_attributes.map((key, value) {
+    return Map<String, dynamic>.from(
+        {..._attributes, ..._relationshipCache}.map((key, value) {
       if (value is DateTime) {
         return MapEntry(key, value.toIso8601String());
+      } else if (value is DModel) {
+        return MapEntry(key, value.toMap());
+      } else if (value is List<DModel>) {
+        return MapEntry(key, value.map((item) => item.toMap()).toList());
       }
       return MapEntry(key, value);
     }));
@@ -313,6 +329,170 @@ abstract class DModel {
 
   /// Get the primary key value
   dynamic get id => _attributes[primaryKey];
+
+  // Relationship Methods
+
+  /// Create a HasOne relationship
+  ///
+  /// ```dart
+  /// class User extends DModel {
+  ///   HasOne<Profile> profile() => hasOne<Profile>();
+  /// }
+  /// ```
+  HasOne<T> hasOne<T extends DModel>({
+    String? foreignKey,
+    String? localKey,
+  }) {
+    return HasOne<T>(
+      this,
+      foreignKey: foreignKey,
+      localKey: localKey,
+    );
+  }
+
+  /// Create a HasMany relationship
+  ///
+  /// ```dart
+  /// class User extends DModel {
+  ///   HasMany<Post> posts() => hasMany<Post>();
+  /// }
+  /// ```
+  HasMany<T> hasMany<T extends DModel>({
+    String? foreignKey,
+    String? localKey,
+  }) {
+    return HasMany<T>(
+      this,
+      foreignKey: foreignKey,
+      localKey: localKey,
+    );
+  }
+
+  /// Create a BelongsTo relationship
+  ///
+  /// ```dart
+  /// class Post extends DModel {
+  ///   BelongsTo<User> user() => belongsTo<User>();
+  /// }
+  /// ```
+  BelongsTo<T> belongsTo<T extends DModel>({
+    String? foreignKey,
+    String? ownerKey,
+  }) {
+    return BelongsTo<T>(
+      this,
+      foreignKey: foreignKey,
+      ownerKey: ownerKey,
+    );
+  }
+
+  /// Create a BelongsToMany relationship
+  ///
+  /// ```dart
+  /// class User extends DModel {
+  ///   BelongsToMany<Role> roles() => belongsToMany<Role>();
+  /// }
+  /// ```
+  BelongsToMany<T> belongsToMany<T extends DModel>({
+    String? pivotTable,
+    String? foreignPivotKey,
+    String? relatedPivotKey,
+    String? localKey,
+    String? relatedKey,
+    bool withTimestamps = false,
+    List<String> pivotColumns = const [],
+  }) {
+    return BelongsToMany<T>(
+      this,
+      pivotTable: pivotTable,
+      foreignPivotKey: foreignPivotKey,
+      relatedPivotKey: relatedPivotKey,
+      localKey: localKey,
+      relatedKey: relatedKey,
+      withTimestamps: withTimestamps,
+      pivotColumns: pivotColumns,
+    );
+  }
+
+  /// Load a relationship and cache it
+  ///
+  /// ```dart
+  /// final user = await User.find<User>(1);
+  /// final profile = await user.loadRelationship('profile');
+  /// ```
+  Future<T?> loadRelationship<T>(String relationshipName) async {
+    if (_relationshipCache.containsKey(relationshipName)) {
+      return _relationshipCache[relationshipName] as T?;
+    }
+
+    // Use reflection to call the relationship method
+    try {
+      final instanceMirror = reflect(this);
+      final methodMirror =
+          instanceMirror.type.declarations[Symbol(relationshipName)];
+
+      if (methodMirror != null && methodMirror is MethodMirror) {
+        final relationship =
+            instanceMirror.invoke(Symbol(relationshipName), []).reflectee;
+
+        if (relationship is Relationship) {
+          final result = await relationship.first();
+          _relationshipCache[relationshipName] = result;
+          return result as T?;
+        }
+      }
+    } catch (e) {
+      _logger.warning('Failed to load relationship $relationshipName: $e');
+    }
+
+    return null;
+  }
+
+  /// Load multiple relationships and cache them
+  ///
+  /// ```dart
+  /// final user = await User.find<User>(1);
+  /// await user.loadRelationships(['profile', 'posts']);
+  /// ```
+  Future<void> loadRelationships(List<String> relationshipNames) async {
+    for (final name in relationshipNames) {
+      await loadRelationship(name);
+    }
+  }
+
+  /// Get a cached relationship
+  ///
+  /// ```dart
+  /// final profile = user.getRelationship<Profile>('profile');
+  /// ```
+  T? getRelationship<T>(String relationshipName) {
+    return _relationshipCache[relationshipName] as T?;
+  }
+
+  /// Check if a relationship is loaded
+  ///
+  /// ```dart
+  /// if (user.isRelationshipLoaded('profile')) {
+  ///   // Use cached data
+  /// }
+  /// ```
+  bool isRelationshipLoaded(String relationshipName) {
+    return _relationshipCache.containsKey(relationshipName);
+  }
+
+  /// Clear relationship cache
+  void clearRelationshipCache([String? relationshipName]) {
+    if (relationshipName != null) {
+      _relationshipCache.remove(relationshipName);
+    } else {
+      _relationshipCache.clear();
+    }
+  }
+
+  /// Set relationship cache (used by QueryBuilder for eager loading)
+  void setRelationshipCache(String relationshipName, dynamic value) {
+    _relationshipCache[relationshipName] = value;
+  }
 
   // Private Methods
 
@@ -426,6 +606,9 @@ abstract class DModel {
     _originalAttributes.addAll(attributes);
 
     _isNewRecord = isNewRecord;
+
+    // Clear relationship cache when attributes change
+    _relationshipCache.clear();
   }
 
   bool _hasChanges() {
@@ -489,7 +672,7 @@ abstract class DModel {
   String toString() {
     final className = runtimeType.toString();
     final id = _attributes[primaryKey];
-    return '$className(id: $id, attributes: $_attributes)';
+    return '$className(id: $id, attributes: $_attributes, relationshipCache: $_relationshipCache)';
   }
 
   @override

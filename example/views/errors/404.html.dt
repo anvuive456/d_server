@@ -1,0 +1,17 @@
+<div class="error-page">
+    <h1>404 - Page Not Found</h1>
+    <p>The page you are looking for does not exist.</p>
+    <p>{{{@link_to("← Go Home", "/")}}}</p>
+</div>
+
+<style>
+.error-page {
+    text-align: center;
+    padding: 60px 20px;
+}
+.error-page h1 {
+    font-size: 3em;
+    color: #e74c3c;
+    margin-bottom: 20px;
+}
+</style>

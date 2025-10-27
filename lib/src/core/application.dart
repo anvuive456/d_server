@@ -370,6 +370,9 @@ class DApplication {
       return (Request request) async {
         try {
           return await innerHandler(request);
+        } on HijackException {
+          // Let hijacked requests pass through
+          rethrow;
         } catch (error, stackTrace) {
           _logger.error('Unhandled error: $error');
           _logger.debug('Stack trace: $stackTrace');

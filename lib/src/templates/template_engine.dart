@@ -127,15 +127,11 @@ class TemplateEngine {
 
     // Date formatting helper
     _engine.registerFunction('format_date', (args) {
-      _logger.info('Formate date: ${args}');
-
       if (args.isEmpty) return '';
       final dateStr = args[0].toString();
       final format = args.length > 1 ? args[1].toString() : 'yyyy-MM-dd';
       return _formatDate(dateStr, format);
     });
-
-    _logger.info('Registered formatDate ${_engine.hasFunction('formatDate')}');
 
     // CSS link tag helper
     _engine.registerFunction('stylesheet_link_tag', (args) {

@@ -1,32 +1,45 @@
 import 'package:d_server/d_server.dart';
 
+import '../models/task.dart';
 import '../models/todo.dart';
 
 /// Controller for managing Todo items
 class TodoController extends DController with Authenticatable {
-  @override
-  Future<void> beforeAction() async {
-    storeLocation();
-    authenticateUser();
-  }
-
   /// GET /todo
   @override
   Future<Response> index() async {
-    final todos = await Todo.listAll();
+    final todos = await DModel.query<Todo>()
+        .withRelation('tasks')
+        .withRelation('tasks.todo')
+        .get();
+    DLogger.info('Fetched ${todos} todos from database');
+
+    DLogger.info('Rendering ${todos.length} todos with tasks');
+
+    DLogger.info('Todos data: ${todos.map((t) => t.toMap())}');
+
     return render(
       'todo/index',
       locals: {
         'title': 'Todo List',
         'todos': todos
-            .map((e) => {
-                  'id': e.id,
-                  'title': e.title,
-                  'completed': e.completed,
-                  'created_at': e.createdAt?.toIso8601String(),
-                  'updated_at': e.updatedAt?.toIso8601String(),
+            .map((todo) => {
+                  'id': todo.id,
+                  'title': todo.title,
+                  'completed': todo.completed,
+                  'created_at': todo.createdAt?.toIso8601String(),
+                  'updated_at': todo.updatedAt?.toIso8601String(),
+                  'tasks': todo.taskList
+                      .map((task) => {
+                            'id': task.id,
+                            'name': task.name,
+                            'completed': task.completed,
+                            'created_at': task.createdAt?.toIso8601String(),
+                            'updated_at': task.updatedAt?.toIso8601String(),
+                          })
+                      .toList(),
                 })
-            .toList()
+            .toList(),
       },
     );
   }

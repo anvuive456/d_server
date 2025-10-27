@@ -56,6 +56,11 @@ class SyncRenderer {
   String render(List<Token> tokens, Map<String, dynamic> context,
       {String? currentDirectory}) {
     _currentDirectory = currentDirectory;
+    return _renderTokens(tokens, context);
+  }
+
+  /// Internal method to render tokens without modifying currentDirectory
+  String _renderTokens(List<Token> tokens, Map<String, dynamic> context) {
     final buffer = StringBuffer();
     var i = 0;
 
@@ -351,6 +356,8 @@ class SyncRenderer {
       if (token.type == TokenType.sectionStart) {
         nestLevel++;
         sectionTokens.add(token);
+      } else if (token.type == TokenType.invertedSection) {
+        sectionTokens.add(token);
       } else if (token.type == TokenType.sectionEnd) {
         if (nestLevel == 0 && token.content == sectionName) {
           break; // Found matching end
@@ -394,19 +401,16 @@ class SyncRenderer {
         } else {
           itemContext['.'] = item; // Current item accessor
         }
-        buffer.write(render(sectionTokens, itemContext,
-            currentDirectory: _currentDirectory));
+        buffer.write(_renderTokens(sectionTokens, itemContext));
       }
     } else if (sectionValue is Map<String, dynamic>) {
       // Render with the map as additional context
       final mapContext = Map<String, dynamic>.from(context);
       mapContext.addAll(sectionValue);
-      buffer.write(render(sectionTokens, mapContext,
-          currentDirectory: _currentDirectory));
+      buffer.write(_renderTokens(sectionTokens, mapContext));
     } else {
       // Truthy value: render once
-      buffer.write(
-          render(sectionTokens, context, currentDirectory: _currentDirectory));
+      buffer.write(_renderTokens(sectionTokens, context));
     }
 
     return SectionRenderResult(buffer.toString(), endIndex + 1);
@@ -431,9 +435,10 @@ class SyncRenderer {
     while (endIndex < tokens.length) {
       final token = tokens[endIndex];
 
-      if (token.type == TokenType.sectionStart ||
-          token.type == TokenType.invertedSection) {
+      if (token.type == TokenType.sectionStart) {
         nestLevel++;
+        sectionTokens.add(token);
+      } else if (token.type == TokenType.invertedSection) {
         sectionTokens.add(token);
       } else if (token.type == TokenType.sectionEnd) {
         if (nestLevel == 0 && token.content == sectionName) {
@@ -465,8 +470,7 @@ class SyncRenderer {
         (sectionValue is List && sectionValue.isEmpty) ||
         (sectionValue is Map && sectionValue.isEmpty) ||
         (sectionValue is String && sectionValue.isEmpty)) {
-      content =
-          render(sectionTokens, context, currentDirectory: _currentDirectory);
+      content = _renderTokens(sectionTokens, context);
     }
 
     return SectionRenderResult(content, endIndex + 1);

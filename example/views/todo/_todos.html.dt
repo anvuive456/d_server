@@ -1,0 +1,22 @@
+    <ul>
+        {{#todos}}
+        <li class="rounded border p-4 my-4 last:mb-0">
+        <h1 class="text-md">{{title}}</h1>
+        <h1 >Completed:
+        {{#completed}}<span>Yes</span>{{/completed}}
+        {{^completed}}<span>No</span>{{/completed}}
+        </h1>
+        <h2 >{{@format_date(created_at)}}</h2>
+        <h2 >{{@format_date(updated_at)}}</h2>
+
+        <ol>
+        {{#tasks}}
+          <li class="{{#completed}}line-through text-gray-500{{/completed}}">{{name}}</li>
+        {{/tasks}}
+        </ol>
+        {{^tasks}}
+          <p class="text-md">No tasks available.</p>
+        {{/tasks}}
+        </li>
+        {{/todos}}
+    </ul>

@@ -1,19 +1,20 @@
+import 'package:petitparser/petitparser.dart' hide Token;
 import 'token.dart';
-import 'lexer.dart';
+import 'petit_parser_grammar.dart';
 import '../exceptions/template_exception.dart';
 
 /// A high-performance template parser that converts template strings into tokens.
 ///
-/// This parser uses an optimized lexer for fast single-pass parsing with
-/// minimal memory allocations. It supports both basic Mustache syntax
-/// and extended function call syntax.
+/// This parser uses PetitParser for robust parsing with proper error handling
+/// and recovery. It supports both basic Mustache syntax and extended function
+/// call syntax with full AST generation capabilities.
 ///
 /// ## Performance Features:
-/// - Single-pass parsing via optimized lexer
-/// - Pre-compiled regex patterns
-/// - Minimal string allocations
-/// - Fast mustache expression detection
-/// - Efficient argument parsing
+/// - PetitParser combinator-based parsing
+/// - Rich AST generation for LSP support
+/// - Proper error recovery and reporting
+/// - Position tracking for debugging
+/// - Extensible grammar definition
 ///
 /// ## Supported Syntax:
 /// - Variables: `{{variable}}`, `{{object.property}}`
@@ -30,7 +31,7 @@ import '../exceptions/template_exception.dart';
 /// final tokens = parser.parse('Hello {{@uppercase(name)}}!');
 /// ```
 class TemplateParser {
-  final Lexer _lexer = Lexer();
+  final MustacheTemplateParser _parser = MustacheTemplateParser();
 
   /// Parses a template string into a list of tokens.
   ///
@@ -40,7 +41,7 @@ class TemplateParser {
   /// Throws [TemplateException] if parsing fails.
   List<Token> parse(String template) {
     try {
-      final tokens = _lexer.tokenize(template);
+      final tokens = _parser.parse(template);
       _validateTokenStructure(tokens);
       return tokens;
     } catch (e) {

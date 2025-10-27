@@ -8,5 +8,5 @@
 
 
 
-    {{> todo/_todos }}
+    {{> _todos }}
 </div>

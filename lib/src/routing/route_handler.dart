@@ -184,6 +184,9 @@ class RouteHandler {
           body: jsonEncode({'error': 'Invalid state: ${e.message}'}),
           headers: {'content-type': 'application/json'},
         );
+      } on HijackException {
+        // Let hijack exceptions pass through
+        rethrow;
       } catch (e) {
         _logger.error('Unhandled error in route handler: $e');
         return Response.internalServerError(

@@ -119,7 +119,6 @@ class BuiltinHelpers {
 
   // Date helpers implementation
   static dynamic _formatDate(List<dynamic> args) {
-    print('Format Date ${args}');
     if (args.isEmpty) return '';
     final date = args[0];
     if (date == null) return '';
