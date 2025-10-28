@@ -12,3 +12,11 @@
 
 - New Template Engine with better performance.
 - Fix asset pipeline bugs.
+
+## 0.4.0
+
+- Fix Template Engine bug with adjacent sections in list context.
+- Improve documentation.
+- Add web socket support.
+- Add queryParam, renderWhen, JS defer
+

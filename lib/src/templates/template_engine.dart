@@ -142,7 +142,9 @@ class TemplateEngine {
     // JavaScript include tag helper
     _engine.registerFunction('javascript_include_tag', (args) {
       if (args.isEmpty) return '';
-      return _javascriptIncludeTag(args[0].toString());
+      final src = args[0].toString();
+      final defer = args.length > 1 ? args[1].toString() : '';
+      return _javascriptIncludeTag(src, defer);
     });
 
     // Image tag helper
@@ -208,9 +210,11 @@ class TemplateEngine {
   }
 
   /// Generate JavaScript include tag
-  String _javascriptIncludeTag(String src) {
-    final assetSrc = _assetPath('$src.js');
-    return '<script src="$assetSrc" type="text/javascript"></script>';
+  String _javascriptIncludeTag(String src, String defer) {
+    final assetSrc =
+        src.startsWith(RegExp('https|http')) ? src : _assetPath('$src.js');
+    final hasDefer = defer == 'true';
+    return '<script src="$assetSrc" type="text/javascript"${hasDefer ? ' defer' : ''}></script>';
   }
 
   /// Generate image tag

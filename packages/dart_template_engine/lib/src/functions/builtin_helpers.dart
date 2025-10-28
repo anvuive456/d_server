@@ -76,6 +76,28 @@ class BuiltinHelpers {
     registry.registerBuiltinFunction('default', _default);
     registry.registerBuiltinFunction('isEmpty', _isEmpty);
     registry.registerBuiltinFunction('isNotEmpty', _isNotEmpty);
+
+    // Render helpers
+    registry.registerBuiltinFunction('renderWhen', _renderWhen);
+  }
+
+  // Render helpers implementation
+  // Usage: {{ renderWhen(condition, trueValue, falseValue) }}
+  // Renders trueValue if condition is true|notEmpty|!null, else falseValue.
+  static dynamic _renderWhen(List<dynamic> args) {
+    if (args.length < 3) return null;
+    final condition = args[0];
+    final trueValue = args[1];
+    final falseValue = args[2];
+    return switch (condition) {
+      bool b when b == true => trueValue,
+      String s when s.isNotEmpty => trueValue,
+      List l when l.isNotEmpty => trueValue,
+      Map m when m.isNotEmpty => trueValue,
+      Set se when se.isNotEmpty => trueValue,
+      // Object? obj when obj != null => trueValue,
+      _ => falseValue,
+    };
   }
 
   static dynamic _text(List<dynamic> args) {

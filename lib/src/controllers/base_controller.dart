@@ -90,6 +90,29 @@ abstract class DController {
     }
   }
 
+  /// Get a query parameter value with type casting
+  T queryParam<T>(String key, {T? defaultValue}) {
+    final value = query[key];
+
+    if (value == null) return defaultValue as T;
+
+    // Handle type conversion
+    if (T == String) {
+      return value as T;
+    } else if (T == int) {
+      return int.tryParse(value) as T? ?? defaultValue as T;
+    } else if (T == double) {
+      return double.tryParse(value) as T? ?? defaultValue as T;
+    } else if (T == bool) {
+      final lower = value.toLowerCase();
+      if (lower == 'true' || lower == '1') return true as T;
+      if (lower == 'false' || lower == '0') return false as T;
+      return defaultValue as T;
+    }
+
+    return value as T;
+  }
+
   /// Process the controller action with filters
   Future<Response> processAction(String actionName) async {
     final stopwatch = Stopwatch()..start();

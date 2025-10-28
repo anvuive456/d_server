@@ -364,6 +364,8 @@ class SyncRenderer {
         } else if (nestLevel > 0) {
           nestLevel--;
           sectionTokens.add(token);
+        } else {
+          sectionTokens.add(token);
         }
       } else {
         sectionTokens.add(token);
@@ -445,6 +447,8 @@ class SyncRenderer {
           break;
         } else if (nestLevel > 0) {
           nestLevel--;
+          sectionTokens.add(token);
+        } else {
           sectionTokens.add(token);
         }
       } else {
